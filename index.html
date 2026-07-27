@@ -1,1 +1,86 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#bfe7ff"><title>Cloud Pantry Web Hub</title><link rel="stylesheet" href="styles.css"></head><body><header><div><small>Cloud Pantry Web Hub</small><h1>Shared household dashboard ☁️</h1><p>Connect the same Supabase household used by both Android phones.</p></div><div id="status" class="status">Not connected</div></header><main><section class="card"><h2>Connection</h2><div class="grid"><label>Supabase URL<input id="url" placeholder="https://project.supabase.co"></label><label>Publishable key<input id="key" type="password" placeholder="sb_publishable_..."></label><label>Email<input id="email" type="email"></label><label>Password<input id="password" type="password"></label></div><div class="actions"><button id="saveConfig">Save configuration</button><button id="signUp">Create account</button><button id="signIn" class="primary">Sign in</button><button id="signOut">Sign out</button></div></section><section class="card"><h2>Shared household</h2><div class="grid"><label>Create household<input id="householdName" placeholder="Ono Household"></label><label>Join code<input id="joinCode" placeholder="AB12CD34"></label></div><div class="actions"><button id="createHousehold">Create</button><button id="joinHousehold">Join</button><button id="pull" class="primary">Pull latest</button><button id="push">Push changes</button></div><p>Invite code: <strong id="inviteCode">—</strong></p></section><section id="workspace" hidden><div class="metrics"><article><small>Calories today</small><strong id="calories">0</strong><button id="resetCalories">Reset</button></article><article><small>Monthly spend</small><strong id="spend">$0</strong></article><article><small>Budget</small><strong id="budget">$0</strong></article></div><section class="card"><h2>Profile, spending, and budget</h2><div class="grid"><label>Personal name<input id="personalName"></label><label>Household name<input id="profileHousehold"></label><label>Calories today<input id="calorieInput" type="number" min="0"></label><label>Monthly spend<input id="spendInput" type="number" min="0"></label><label>Weekly produce<input id="produceInput" type="number" min="0"></label><label>Monthly supplies<input id="suppliesInput" type="number" min="0"></label><label>Monthly budget<input id="budgetInput" type="number" min="0"></label></div><button id="saveDashboard" class="primary">Save locally, then push</button><div id="advice" class="advice"></div></section><section class="card"><h2>Shopping list</h2><div id="shopping"></div></section></section></main><footer>Cloud Pantry v1.0.5 companion site • Vanilla HTML/CSS/JavaScript</footer><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#bfe7ff">
+  <title>Cloud Pantry Web Hub</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div>
+      <small>Cloud Pantry Web Hub</small>
+      <h1>Shared household dashboard ☁️</h1>
+      <p>Connect the same Supabase household used by both Android phones.</p>
+    </div>
+    <div id="status" class="status">Not connected</div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Connection</h2>
+      <div class="grid">
+        <label>Supabase URL<input id="url" placeholder="https://project.supabase.co"></label>
+        <label>Publishable key<input id="key" type="password" placeholder="sb_publishable_..."></label>
+        <label>Email<input id="email" type="email" autocomplete="email"></label>
+        <label>Password<input id="password" type="password" autocomplete="current-password"></label>
+      </div>
+      <div class="actions">
+        <button id="saveConfig">Save configuration</button>
+        <button id="signUp">Create account</button>
+        <button id="resendConfirmation">Resend confirmation</button>
+        <button id="signIn" class="primary">Sign in</button>
+        <button id="signOut">Sign out</button>
+      </div>
+      <p class="muted">After confirming your email, return to this page. Cloud Pantry will detect the confirmation automatically.</p>
+    </section>
+
+    <section class="card">
+      <h2>Shared household</h2>
+      <div class="grid">
+        <label>Create household<input id="householdName" placeholder="Ono Household"></label>
+        <label>Join code<input id="joinCode" placeholder="AB12CD34"></label>
+      </div>
+      <div class="actions">
+        <button id="createHousehold">Create</button>
+        <button id="joinHousehold">Join</button>
+        <button id="pull" class="primary">Pull latest</button>
+        <button id="push">Push changes</button>
+      </div>
+      <p>Invite code: <strong id="inviteCode">—</strong></p>
+    </section>
+
+    <section id="workspace" hidden>
+      <div class="metrics">
+        <article><small>Calories today</small><strong id="calories">0</strong><button id="resetCalories">Reset</button></article>
+        <article><small>Monthly spend</small><strong id="spend">$0</strong></article>
+        <article><small>Budget</small><strong id="budget">$0</strong></article>
+      </div>
+
+      <section class="card">
+        <h2>Profile, spending, and budget</h2>
+        <div class="grid">
+          <label>Personal name<input id="personalName"></label>
+          <label>Household name<input id="profileHousehold"></label>
+          <label>Calories today<input id="calorieInput" type="number" min="0"></label>
+          <label>Monthly spend<input id="spendInput" type="number" min="0"></label>
+          <label>Weekly produce<input id="produceInput" type="number" min="0"></label>
+          <label>Monthly supplies<input id="suppliesInput" type="number" min="0"></label>
+          <label>Monthly budget<input id="budgetInput" type="number" min="0"></label>
+        </div>
+        <button id="saveDashboard" class="primary">Save locally, then push</button>
+        <div id="advice" class="advice"></div>
+      </section>
+
+      <section class="card">
+        <h2>Shopping list</h2>
+        <div id="shopping"></div>
+      </section>
+    </section>
+  </main>
+
+  <footer>Cloud Pantry v1.0.5 companion site • Vanilla HTML/CSS/JavaScript</footer>
+  <script src="app.js"></script>
+</body>
+</html>
