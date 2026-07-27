@@ -4,6 +4,13 @@ const storeKey = 'cloudPantryWebConfig';
 const DEFAULT_URL = 'https://goxegmqibodfmzgcvykn.supabase.co';
 const DEFAULT_KEY = 'sb_publishable_xSXYc9RW2aOFbBVD7-P7uQ_PmYU8WmC';
 const AUTH_REDIRECT = 'https://hondzilla.github.io/cloud-pantry-web/';
+const RPC = {
+  create: '/rest/v1/rpc/create_cloud_pantry_household_v2',
+  join: '/rest/v1/rpc/join_cloud_pantry_household_v2',
+  list: '/rest/v1/rpc/list_cloud_pantry_households_v2',
+  pull: '/rest/v1/rpc/pull_cloud_pantry_state_v2',
+  push: '/rest/v1/rpc/push_cloud_pantry_state_v2'
+};
 
 let config = JSON.parse(localStorage.getItem(storeKey) || '{}');
 if (!config.url) config.url = DEFAULT_URL;
@@ -47,8 +54,8 @@ async function request(method, path, body, auth = true) {
     body: body === undefined ? undefined : JSON.stringify(body)
   });
 
-  let data = null;
   const raw = await response.text();
+  let data = null;
   if (raw) {
     try {
       data = JSON.parse(raw);
@@ -67,6 +74,33 @@ async function request(method, path, body, auth = true) {
     );
   }
   return data;
+}
+
+function rpcObject(data) {
+  if (data && !Array.isArray(data) && typeof data === 'object') return data;
+  if (Array.isArray(data) && data.length === 1 && data[0] && typeof data[0] === 'object') {
+    const first = data[0];
+    const keys = Object.keys(first);
+    const onlyValue = keys.length === 1 ? first[keys[0]] : null;
+    if (onlyValue && !Array.isArray(onlyValue) && typeof onlyValue === 'object') return onlyValue;
+    return first;
+  }
+  throw new Error('Unexpected server response.');
+}
+
+function rpcArray(data) {
+  if (Array.isArray(data)) {
+    if (data.length === 1 && data[0] && typeof data[0] === 'object') {
+      const keys = Object.keys(data[0]);
+      if (keys.length === 1 && Array.isArray(data[0][keys[0]])) return data[0][keys[0]];
+    }
+    return data;
+  }
+  if (data && typeof data === 'object') {
+    const keys = Object.keys(data);
+    if (keys.length === 1 && Array.isArray(data[keys[0]])) return data[keys[0]];
+  }
+  return [];
 }
 
 function setConfigFields() {
@@ -120,10 +154,7 @@ async function signUp() {
   }
 
   const path = `/auth/v1/signup?redirect_to=${encodeURIComponent(AUTH_REDIRECT)}`;
-  const data = await request('POST', path, {
-    email: config.email,
-    password
-  }, false);
+  const data = await request('POST', path, { email: config.email, password }, false);
 
   if (data?.access_token) {
     session = data;
@@ -138,12 +169,8 @@ async function signUp() {
 async function resendConfirmation() {
   save();
   if (!config.email) throw new Error('Enter your email first.');
-
   const path = `/auth/v1/resend?redirect_to=${encodeURIComponent(AUTH_REDIRECT)}`;
-  await request('POST', path, {
-    type: 'signup',
-    email: config.email
-  }, false);
+  await request('POST', path, { type: 'signup', email: config.email }, false);
   status('A new confirmation email was sent.');
 }
 
@@ -152,10 +179,7 @@ async function signIn() {
   const data = await request(
     'POST',
     '/auth/v1/token?grant_type=password',
-    {
-      email: config.email,
-      password: $('#password').value
-    },
+    { email: config.email, password: $('#password').value },
     false
   );
   session = data;
@@ -168,6 +192,7 @@ function signOut() {
   session = null;
   household = null;
   state = null;
+  revision = 0;
   save();
   $('#workspace').hidden = true;
   $('#inviteCode').textContent = '—';
@@ -176,16 +201,19 @@ function signOut() {
 
 async function loadHouseholds() {
   if (!session?.access_token) throw new Error('Sign in first.');
-  const rows = await request('POST', '/rest/v1/rpc/list_cloud_pantry_households', {});
-  if (rows.length) {
-    household = rows[0];
+  const data = await request('POST', RPC.list, {});
+  const households = rpcArray(data);
+
+  if (households.length) {
+    household = households[0];
     revision = Number(household.revision) || 0;
     save();
-    $('#inviteCode').textContent = household.invite_code;
+    $('#inviteCode').textContent = household.invite_code || '—';
     await pull();
   } else {
     household = null;
     state = null;
+    revision = 0;
     save();
     $('#workspace').hidden = true;
     status('Signed in. Create or join a household.');
@@ -194,22 +222,14 @@ async function loadHouseholds() {
 
 async function createHousehold() {
   const name = $('#householdName').value.trim() || 'My Household';
-  const rows = await request(
-    'POST',
-    '/rest/v1/rpc/create_cloud_pantry_household',
-    { p_name: name }
-  );
+  const result = rpcObject(await request('POST', RPC.create, { p_name: name }));
 
-  household = {
-    household_id: rows[0].household_id,
-    household_name: name,
-    invite_code: rows[0].invite_code
-  };
-  revision = 0;
+  household = result;
+  revision = Number(result.revision) || 0;
   save();
-  $('#inviteCode').textContent = household.invite_code;
+  $('#inviteCode').textContent = household.invite_code || '—';
   state = defaultState();
-  state.profile.household = name;
+  state.profile.household = result.household_name || name;
   await push();
   render();
   status('Household created.');
@@ -219,15 +239,11 @@ async function joinHousehold() {
   const code = $('#joinCode').value.trim().toUpperCase();
   if (!code) throw new Error('Enter the invite code.');
 
-  const rows = await request(
-    'POST',
-    '/rest/v1/rpc/join_cloud_pantry_household',
-    { p_invite_code: code }
-  );
-  household = rows[0];
-  revision = Number(household.revision) || 0;
+  const result = rpcObject(await request('POST', RPC.join, { p_invite_code: code }));
+  household = result;
+  revision = Number(result.revision) || 0;
   save();
-  $('#inviteCode').textContent = household.invite_code;
+  $('#inviteCode').textContent = household.invite_code || '—';
   await pull();
   status('Household joined.');
 }
@@ -235,10 +251,7 @@ async function joinHousehold() {
 function defaultState() {
   return {
     version: 2,
-    profile: {
-      household: 'My Household',
-      name: 'Friend'
-    },
+    profile: { household: 'My Household', name: 'Friend' },
     shopping: {},
     inventoryStatus: {},
     favorites: [],
@@ -246,46 +259,35 @@ function defaultState() {
     cooked: [],
     mealCalories: 0,
     calorieTarget: 2000,
-    dashboard: {
-      monthlySpend: 0,
-      weeklyProduce: 0,
-      monthlySupplies: 0
-    },
-    budget: {
-      monthlyTarget: 0
-    }
+    dashboard: { monthlySpend: 0, weeklyProduce: 0, monthlySupplies: 0 },
+    budget: { monthlyTarget: 0 }
   };
 }
 
 async function pull() {
-  if (!household) throw new Error('Choose a household first.');
-  const rows = await request(
-    'POST',
-    '/rest/v1/rpc/pull_cloud_pantry_state',
-    { p_household_id: household.household_id }
-  );
-  const row = rows[0];
-  revision = Number(row.revision) || 0;
-  state = row.state && Object.keys(row.state).length ? row.state : defaultState();
-  household.household_name = row.household_name;
-  household.invite_code = row.invite_code;
+  if (!household?.household_id) throw new Error('Choose a household first.');
+  const result = rpcObject(await request('POST', RPC.pull, {
+    p_household_id: household.household_id
+  }));
+
+  revision = Number(result.revision) || 0;
+  state = result.state && Object.keys(result.state).length ? result.state : defaultState();
+  household.household_name = result.household_name;
+  household.invite_code = result.invite_code;
   save();
+  $('#inviteCode').textContent = household.invite_code || '—';
   render();
   status('Latest household loaded.');
 }
 
 async function push() {
-  if (!state || !household) throw new Error('Load a household first.');
-  const rows = await request(
-    'POST',
-    '/rest/v1/rpc/push_cloud_pantry_state',
-    {
-      p_household_id: household.household_id,
-      p_state: state,
-      p_base_revision: revision
-    }
-  );
-  revision = Number(rows[0].revision) || revision;
+  if (!state || !household?.household_id) throw new Error('Load a household first.');
+  const result = rpcObject(await request('POST', RPC.push, {
+    p_household_id: household.household_id,
+    p_state: state,
+    p_base_revision: revision
+  }));
+  revision = Number(result.revision) || revision;
   status('Changes uploaded.');
 }
 
@@ -344,6 +346,7 @@ function render() {
 }
 
 function saveDashboard() {
+  if (!state) throw new Error('Load a household first.');
   state.profile.name = $('#personalName').value.trim();
   state.profile.household = $('#profileHousehold').value.trim();
   state.mealCalories = Math.max(0, Number($('#calorieInput').value) || 0);
@@ -366,10 +369,7 @@ function bind(selector, handler) {
 }
 
 setConfigFields();
-bind('#saveConfig', () => {
-  save();
-  status('Configuration saved.');
-});
+bind('#saveConfig', () => { save(); status('Configuration saved.'); });
 bind('#signUp', signUp);
 bind('#resendConfirmation', resendConfirmation);
 bind('#signIn', signIn);
@@ -388,7 +388,7 @@ bind('#resetCalories', () => {
 
 (async function initialize() {
   const handledRedirect = await consumeAuthRedirect();
-  if (!handledRedirect && session && household) {
+  if (!handledRedirect && session) {
     loadHouseholds().catch((error) => status(error.message));
   }
 })();
